@@ -127,6 +127,13 @@
   }
   #numpad button:hover { background: #e0e0e0; }
   #numpad button.erase { font-size: calc(var(--cell-size) * 0.22); background: #fafafa; }
+  #numpad button:disabled {
+    background: #e0e0e0;
+    color: #aaa;
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  #numpad button:disabled:hover { background: #e0e0e0; }
 
   #modeBar {
     margin-top: 12px;
@@ -179,6 +186,91 @@
     #numpad { gap: 4px; }
     #controls button { padding: 8px 12px; font-size: 13px; }
   }
+
+  #winOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 24, 32, 0.28);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: hidden;
+  }
+  #winOverlay.show { display: flex; }
+
+  .confetti-piece {
+    position: absolute;
+    top: -20px;
+    width: 8px;
+    height: 14px;
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 1;
+    animation-name: confettiFall;
+    animation-timing-function: ease-in;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+  }
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(115vh) rotate(720deg); opacity: 0.85; }
+  }
+
+  .win-popup {
+    position: relative;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 18px;
+    padding: 36px 32px 30px;
+    max-width: 320px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    animation: popupPop 0.35s ease;
+  }
+  @keyframes popupPop {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .win-title {
+    font-size: clamp(22px, 6vw, 28px);
+    font-weight: 800;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6bcb, #ff6b6b);
+    background-size: 400% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: sparkleShift 2.5s linear infinite;
+  }
+  @keyframes sparkleShift {
+    to { background-position: 400% 0; }
+  }
+
+  .win-subtitle {
+    margin: 0 0 22px;
+    color: #263238;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .win-newgame-btn {
+    padding: 11px 22px;
+    font-size: 15px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    background: #1565c0;
+    color: #fff;
+    cursor: pointer;
+  }
+  .win-newgame-btn:hover { background: #0d47a1; }
 </style>
 </head>
 <body>
@@ -209,6 +301,14 @@
 </div>
 
 <div id="message"></div>
+
+<div id="winOverlay">
+  <div class="win-popup">
+    <div class="win-title">🎉 축하합니다! 🎉</div>
+    <p class="win-subtitle">스도쿠를 완성했습니다!</p>
+    <button id="winNewGameBtn" class="win-newgame-btn">새 게임하기</button>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -394,6 +494,9 @@
   const filledCountEl = document.getElementById('filledCount');
   const memoToggleBtn = document.getElementById('memoToggle');
   const diffButtons = Array.from(document.querySelectorAll('.diff-btn'));
+  const winOverlay = document.getElementById('winOverlay');
+  const winNewGameBtn = document.getElementById('winNewGameBtn');
+  const numberButtons = {}; // num -> button element
 
   function buildBoardDom() {
     boardEl.innerHTML = '';
@@ -426,6 +529,7 @@
       btn.textContent = n;
       btn.addEventListener('click', () => inputNumber(n));
       numpadEl.appendChild(btn);
+      numberButtons[n] = btn;
     }
     const eraseBtn = document.createElement('button');
     eraseBtn.textContent = '지우기';
@@ -439,6 +543,16 @@
     render();
   }
 
+  function countOnBoard(num) {
+    let count = 0;
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (userBoard[r][c] === num) count++;
+      }
+    }
+    return count;
+  }
+
   function inputNumber(num) {
     if (!selected) return;
     const { row, col } = selected;
@@ -449,6 +563,7 @@
       const set = notesBoard[row][col];
       if (set.has(num)) set.delete(num); else set.add(num);
     } else {
+      if (userBoard[row][col] !== num && countOnBoard(num) >= 9) return; // 이미 9개 배치된 숫자는 더 놓을 수 없음
       userBoard[row][col] = num;
       notesBoard[row][col].clear(); // 값을 채우면 그 칸의 메모는 의미가 없으므로 정리
     }
@@ -543,16 +658,61 @@
         cellEl.classList.toggle('same-number', isSameNumber);
       }
     }
+
+    updateNumpadState();
+    updateFilledCount();
+  }
+
+  function updateNumpadState() {
+    for (let n = 1; n <= 9; n++) {
+      numberButtons[n].disabled = countOnBoard(n) >= 9;
+    }
+  }
+
+  function updateFilledCount() {
+    let count = 0;
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (userBoard[r][c] !== 0) count++;
+      }
+    }
+    filledCountEl.textContent = `채워진 칸: ${count} / 81`;
   }
 
   function checkWin() {
-    const isFull = userBoard.every(row => row.every(v => v !== 0));
-    if (!isFull) return;
-    const conflicts = findConflicts();
-    const hasConflict = conflicts.some(row => row.some(v => v));
-    if (!hasConflict) {
-      messageEl.textContent = '축하합니다! 스도쿠를 완성했습니다.';
+    const isComplete = userBoard.every((row, r) => row.every((v, c) => v === solutionBoard[r][c]));
+    if (isComplete) showWinPopup();
+  }
+
+  const CONFETTI_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bcb', '#845ef7'];
+
+  function spawnConfetti(count) {
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = `${Math.random() * 100}%`;
+      piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+      piece.style.animationDuration = `${2.2 + Math.random() * 1.6}s`;
+      piece.style.animationDelay = `${Math.random() * 0.6}s`;
+      piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+      fragment.appendChild(piece);
     }
+    winOverlay.appendChild(fragment);
+  }
+
+  function clearConfetti() {
+    winOverlay.querySelectorAll('.confetti-piece').forEach(el => el.remove());
+  }
+
+  function showWinPopup() {
+    spawnConfetti(60);
+    winOverlay.classList.add('show');
+  }
+
+  function hideWinPopup() {
+    winOverlay.classList.remove('show');
+    clearConfetti();
   }
 
   function setMemoMode(on) {
@@ -570,20 +730,21 @@
     messageEl.textContent = '';
     selected = null;
     setMemoMode(false);
+    hideWinPopup();
 
-    const { puzzle, solution, filledCount } = generatePuzzle(currentDifficulty);
+    const { puzzle, solution } = generatePuzzle(currentDifficulty);
     solutionBoard = solution;
     puzzleBoard = puzzle;
     userBoard = cloneBoard(puzzle);
     givenMask = puzzle.map(row => row.map(v => v !== 0));
     notesBoard = Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => new Set()));
 
-    filledCountEl.textContent = `채워진 칸: ${filledCount} / 81`;
     updateDifficultyButtons();
     render();
   }
 
   document.addEventListener('keydown', (e) => {
+    if (winOverlay.classList.contains('show')) return;
     if (!selected) return;
     if (e.key >= '1' && e.key <= '9') {
       inputNumber(parseInt(e.key, 10));
@@ -603,6 +764,9 @@
   document.getElementById('newGameBtn').addEventListener('click', startNewGame);
   document.getElementById('resetBtn').addEventListener('click', resetBoard);
   memoToggleBtn.addEventListener('click', () => setMemoMode(!memoMode));
+  winNewGameBtn.addEventListener('click', () => {
+    startNewGame();
+  });
 
   diffButtons.forEach(btn => {
     btn.addEventListener('click', () => {
