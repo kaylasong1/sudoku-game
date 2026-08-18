@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스도쿠</title>
+<style>
+  :root {
+    --cell-size: 52px;
+    --border-thin: 1px solid #bbb;
+    --border-thick: 3px solid #333;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+    background: #f2f2f2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 12px;
+    margin: 0;
+  }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  .status-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #444;
+  }
+  .difficulty-badge {
+    background: #4caf50;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: bold;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(9, var(--cell-size));
+    grid-template-rows: repeat(9, var(--cell-size));
+    border: var(--border-thick);
+    background: #fff;
+    user-select: none;
+  }
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    border-right: var(--border-thin);
+    border-bottom: var(--border-thin);
+    cursor: pointer;
+    color: #1565c0;
+    background: #fff;
+  }
+  .cell.given {
+    color: #222;
+    font-weight: bold;
+    background: #f7f7f7;
+    cursor: default;
+  }
+  .cell:nth-child(9n+3) { border-right: var(--border-thick); }
+  .cell:nth-child(9n+6) { border-right: var(--border-thick); }
+  .cell:nth-child(9n) { border-right: none; }
+  .row-thick-bottom { border-bottom: var(--border-thick) !important; }
+  .cell.selected { background: #bbdefb; }
+  .cell.peer { background: #e3f2fd; }
+  .cell.conflict { color: #d32f2f; background: #ffebee; }
+  .cell.given.conflict { background: #ffcdd2; }
+
+  #numpad {
+    display: grid;
+    grid-template-columns: repeat(5, 48px);
+    gap: 8px;
+    margin-top: 20px;
+  }
+  #numpad button {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+    border: 1px solid #999;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+  }
+  #numpad button:hover { background: #e0e0e0; }
+  #numpad button.erase { background: #fafafa; font-size: 14px; }
+
+  #controls {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+  }
+  #controls button {
+    padding: 10px 18px;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    background: #1565c0;
+    color: #fff;
+    cursor: pointer;
+  }
+  #controls button:hover { background: #0d47a1; }
+
+  #message {
+    margin-top: 14px;
+    font-size: 16px;
+    font-weight: bold;
+    min-height: 22px;
+    color: #2e7d32;
+  }
+</style>
+</head>
+<body>
+
+<h1>스도쿠</h1>
+<div class="status-bar">
+  <span class="difficulty-badge" id="difficultyBadge">쉬움</span>
+  <span id="filledCount"></span>
+</div>
+
+<div id="board"></div>
+
+<div id="numpad"></div>
+
+<div id="controls">
+  <button id="newGameBtn">새 게임</button>
+  <button id="eraseBtn">지우기</button>
+</div>
+
+<div id="message"></div>
+
+<script>
+(function () {
+  const SIZE = 9;
+
+  // 난이도별 목표 채움 칸 수 (최소값 기준, 나중에 medium/hard 추가 시 이 객체만 확장)
+  const DIFFICULTIES = {
+    easy: { minFilled: 40, maxFilled: 46 }
+  };
+
+  let solutionBoard = null;
+  let puzzleBoard = null;   // 0 = 빈칸
+  let givenMask = null;     // true면 원래 문제에서 채워진(수정 불가) 칸
+  let userBoard = null;     // 사용자가 실제로 입력 중인 보드
+  let selected = null;      // {row, col}
+
+  // ---------- 스도쿠 생성/검증 로직 ----------
+
+  function createEmptyBoard() {
+    return Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function isValidPlacement(board, row, col, num) {
+    for (let i = 0; i < SIZE; i++) {
+      if (board[row][i] === num) return false;
+      if (board[i][col] === num) return false;
+    }
+    const boxRow = Math.floor(row / 3) * 3;
+    const boxCol = Math.floor(col / 3) * 3;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (board[boxRow + r][boxCol + c] === num) return false;
+      }
+    }
+    return true;
+  }
+
+  function findEmptyCell(board) {
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (board[r][c] === 0) return [r, c];
+      }
+    }
+    return null;
+  }
+
+  // 무작위 순서로 채워서 랜덤한 완성 스도쿠 보드 생성
+  function fillBoardRandomly(board) {
+    const empty = findEmptyCell(board);
+    if (!empty) return true;
+    const [row, col] = empty;
+    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    for (const num of nums) {
+      if (isValidPlacement(board, row, col, num)) {
+        board[row][col] = num;
+        if (fillBoardRandomly(board)) return true;
+        board[row][col] = 0;
+      }
+    }
+    return false;
+  }
+
+  function generateSolvedBoard() {
+    const board = createEmptyBoard();
+    fillBoardRandomly(board);
+    return board;
+  }
+
+  // limit개까지만 세고 조기 종료 (유일해 검증용)
+  function countSolutions(board, limit) {
+    let count = 0;
+
+    function backtrack() {
+      if (count >= limit) return;
+      const empty = findEmptyCell(board);
+      if (!empty) {
+        count++;
+        return;
+      }
+      const [row, col] = empty;
+      for (let num = 1; num <= 9; num++) {
+        if (count >= limit) return;
+        if (isValidPlacement(board, row, col, num)) {
+          board[row][col] = num;
+          backtrack();
+          board[row][col] = 0;
+        }
+      }
+    }
+
+    backtrack();
+    return count;
+  }
+
+  function cloneBoard(board) {
+    return board.map(row => row.slice());
+  }
+
+  function generatePuzzle(difficultyKey) {
+    const { minFilled, maxFilled } = DIFFICULTIES[difficultyKey];
+    const solution = generateSolvedBoard();
+    const puzzle = cloneBoard(solution);
+
+    const positions = shuffle(
+      Array.from({ length: SIZE * SIZE }, (_, i) => i)
+    );
+
+    let filledCount = SIZE * SIZE;
+    const target = minFilled + Math.floor(Math.random() * (maxFilled - minFilled + 1));
+
+    for (const pos of positions) {
+      if (filledCount <= target) break;
+      const row = Math.floor(pos / SIZE);
+      const col = pos % SIZE;
+      if (puzzle[row][col] === 0) continue;
+
+      const backup = puzzle[row][col];
+      puzzle[row][col] = 0;
+
+      const testBoard = cloneBoard(puzzle);
+      const solutions = countSolutions(testBoard, 2);
+
+      if (solutions === 1) {
+        filledCount--;
+      } else {
+        puzzle[row][col] = backup; // 유일해가 깨지면 되돌림
+      }
+    }
+
+    return { puzzle, solution, filledCount };
+  }
+
+  // ---------- 렌더링 & 상호작용 ----------
+
+  const boardEl = document.getElementById('board');
+  const numpadEl = document.getElementById('numpad');
+  const messageEl = document.getElementById('message');
+  const filledCountEl = document.getElementById('filledCount');
+
+  function buildBoardDom() {
+    boardEl.innerHTML = '';
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+        if (r === 2 || r === 5) cell.classList.add('row-thick-bottom');
+        cell.addEventListener('click', () => selectCell(r, c));
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function buildNumpadDom() {
+    numpadEl.innerHTML = '';
+    for (let n = 1; n <= 9; n++) {
+      const btn = document.createElement('button');
+      btn.textContent = n;
+      btn.addEventListener('click', () => inputNumber(n));
+      numpadEl.appendChild(btn);
+    }
+    const eraseBtn = document.createElement('button');
+    eraseBtn.textContent = '지우기';
+    eraseBtn.className = 'erase';
+    eraseBtn.addEventListener('click', eraseSelected);
+    numpadEl.appendChild(eraseBtn);
+  }
+
+  function selectCell(row, col) {
+    selected = { row, col };
+    render();
+  }
+
+  function inputNumber(num) {
+    if (!selected) return;
+    const { row, col } = selected;
+    if (givenMask[row][col]) return;
+    userBoard[row][col] = num;
+    render();
+    checkWin();
+  }
+
+  function eraseSelected() {
+    if (!selected) return;
+    const { row, col } = selected;
+    if (givenMask[row][col]) return;
+    userBoard[row][col] = 0;
+    render();
+  }
+
+  function findConflicts() {
+    const conflicts = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
+
+    function markGroupConflicts(cells) {
+      const seen = {};
+      for (const [r, c] of cells) {
+        const val = userBoard[r][c];
+        if (val === 0) continue;
+        if (!seen[val]) seen[val] = [];
+        seen[val].push([r, c]);
+      }
+      for (const val in seen) {
+        if (seen[val].length > 1) {
+          for (const [r, c] of seen[val]) conflicts[r][c] = true;
+        }
+      }
+    }
+
+    for (let r = 0; r < SIZE; r++) {
+      markGroupConflicts(Array.from({ length: SIZE }, (_, c) => [r, c]));
+    }
+    for (let c = 0; c < SIZE; c++) {
+      markGroupConflicts(Array.from({ length: SIZE }, (_, r) => [r, c]));
+    }
+    for (let br = 0; br < 3; br++) {
+      for (let bc = 0; bc < 3; bc++) {
+        const cells = [];
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            cells.push([br * 3 + r, bc * 3 + c]);
+          }
+        }
+        markGroupConflicts(cells);
+      }
+    }
+
+    return conflicts;
+  }
+
+  function render() {
+    const conflicts = findConflicts();
+    const cells = boardEl.children;
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const idx = r * SIZE + c;
+        const cellEl = cells[idx];
+        const val = userBoard[r][c];
+        cellEl.textContent = val === 0 ? '' : val;
+
+        cellEl.classList.toggle('given', givenMask[r][c]);
+        cellEl.classList.toggle('conflict', conflicts[r][c]);
+        cellEl.classList.toggle('selected', !!selected && selected.row === r && selected.col === c);
+      }
+    }
+  }
+
+  function checkWin() {
+    const isFull = userBoard.every(row => row.every(v => v !== 0));
+    if (!isFull) return;
+    const conflicts = findConflicts();
+    const hasConflict = conflicts.some(row => row.some(v => v));
+    if (!hasConflict) {
+      messageEl.textContent = '축하합니다! 스도쿠를 완성했습니다.';
+    }
+  }
+
+  function startNewGame() {
+    messageEl.textContent = '문제를 생성하는 중...';
+    selected = null;
+    // 렌더 지연 없이 바로 생성 (9x9 규모는 즉시 완료됨)
+    const { puzzle, solution, filledCount } = generatePuzzle('easy');
+    solutionBoard = solution;
+    puzzleBoard = puzzle;
+    userBoard = cloneBoard(puzzle);
+    givenMask = puzzle.map(row => row.map(v => v !== 0));
+
+    filledCountEl.textContent = `채워진 칸: ${filledCount} / 81`;
+    messageEl.textContent = '';
+    render();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (!selected) return;
+    if (e.key >= '1' && e.key <= '9') {
+      inputNumber(parseInt(e.key, 10));
+    } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+      eraseSelected();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      let { row, col } = selected;
+      if (e.key === 'ArrowUp') row = Math.max(0, row - 1);
+      if (e.key === 'ArrowDown') row = Math.min(8, row + 1);
+      if (e.key === 'ArrowLeft') col = Math.max(0, col - 1);
+      if (e.key === 'ArrowRight') col = Math.min(8, col + 1);
+      selectCell(row, col);
+      e.preventDefault();
+    }
+  });
+
+  document.getElementById('newGameBtn').addEventListener('click', startNewGame);
+  document.getElementById('eraseBtn').addEventListener('click', eraseSelected);
+
+  buildBoardDom();
+  buildNumpadDom();
+  startNewGame();
+})();
+</script>
+
+</body>
+</html>
