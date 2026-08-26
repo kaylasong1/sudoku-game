@@ -5,7 +5,7 @@
 
 **플레이:** https://kaylasong1.github.io/sudoku-game/
 
-![SUDOKU Journey 미리보기](final_preview.png)
+![SUDOKU Journey 미리보기](final_preview.webp)
 
 ## 특징
 
