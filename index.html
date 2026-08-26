@@ -9,41 +9,251 @@
     --cell-size: clamp(30px, 8.6vw, 52px);
     --border-thin: 1px solid #bbb;
     --border-thick: 3px solid #333;
+    --panel-bg:  #F8EFD8;
+    --easy:      #5A9C34;
+    --easy-dark: #2C7819;
+    --normal:    #FCEFCD;
+    --hard:      #FAC5BD;
+    --overlay:   rgba(18, 30, 45, .28);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
   body {
     font-family: "Segoe UI", "Malgun Gothic", sans-serif;
     background: #f2f2f2;
+    min-height: 100vh;
+  }
+
+  /* ---------- 화면 전환 ---------- */
+  .screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    padding: 16px 10px 40px;
+  }
+  .screen.active { display: flex; }
+
+  #homeScreen.active {
+    background: linear-gradient(180deg, #e3f7ea 0%, #dbf1e0 45%, #cdeaca 100%);
+  }
+
+  /* ---------- 홈 헤더 (배경 너비를 따라가는 줄) ---------- */
+  #homeHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 10px;
+    width: 100%;
+    margin: 0 0 14px;
+  }
+
+  /* ---------- 난이도 선택 ---------- */
+  #difficultySelector {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .diff-tab {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 16px 10px 32px;
-    margin: 0;
-    min-height: 100vh;
+    gap: 2px;
+    padding: 8px 18px;
+    font-size: clamp(12px, 3.4vw, 14px);
+    font-weight: 700;
+    border: 2px solid var(--easy-dark);
+    border-radius: 16px;
+    background: var(--panel-bg);
+    color: #5c4a32;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
-  h1 { margin: 0 0 10px; font-size: clamp(18px, 5vw, 24px); }
+  .diff-tab-stars {
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  .diff-tab:hover { transform: translateY(-1px); }
+  .diff-tab.active[data-diff="easy"]   { background: var(--easy); border-color: var(--easy-dark); color: #fff; }
+  .diff-tab.active[data-diff="medium"] { background: var(--normal); border-color: var(--easy-dark); color: #5c4a32; }
+  .diff-tab.active[data-diff="hard"]   { background: var(--hard); border-color: var(--easy-dark); color: #7a2e22; }
+  .diff-tab.locked { opacity: 0.65; }
 
-  #difficultyBar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-    justify-content: center;
+  .home-toast {
+    margin: -10px 0 16px;
+    padding: 9px 14px;
+    background: rgba(55, 71, 79, 0.92);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
   }
-  .diff-btn {
-    padding: 7px 14px;
+  .home-toast.show { opacity: 1; transform: translateY(0); }
+
+  #homeContent { width: 100%; max-width: 420px; }
+
+  @media (min-width: 769px) {
+    #homeContent { max-width: 640px; }
+  }
+
+  @media (min-width: 1440px) {
+    /* 105vh 항: 배경 종횡비(1487:1058)상 뷰포트 높이를 넘어 스크롤이 생기지 않도록 폭을 제한 */
+    #homeContent { max-width: min(1440px, 80vw, 105vh); }
+  }
+
+  /* ---------- 스테이지 맵 (배경 이미지 위 절대 위치) ---------- */
+  #stageMapWrap { position: relative; display: flex; justify-content: center; width: 100%; margin: 6px 0 20px; }
+  .title-logo {
+    position: absolute;
+    top: 3%;
+    left: 3%;
+    width: 30%;
+    height: auto;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .sign-board {
+    position: absolute;
+    bottom: 3%;
+    right: 3%;
+    width: 18%;
+    height: auto;
+    z-index: 5;
+    pointer-events: none;
+  }
+  #stageMap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1080 / 1920;
+    border-radius: 14px;
+    overflow: hidden;
+    background-image: url('assets/bg/bg-mobile.webp');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  @media (min-width: 768px) {
+    #stageMap {
+      aspect-ratio: 1487 / 1058;
+      background-image: url('assets/bg/bg-desktop.webp');
+    }
+  }
+  #stageMap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--overlay);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .stage-stone-wrap {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .stage-stars {
+    margin-top: 3px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #ffb300;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  }
+
+  .stage-stone {
+    position: relative;
+    width: 64px; /* JS sets the real size from #stageMap's rendered width — see renderStageMap() */
+    aspect-ratio: 1;
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.18s ease;
+  }
+  .stage-stone img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .stage-stone .stage-fx-img { z-index: 0; }
+  .stage-stone .stage-stone-img { z-index: 1; }
+  .stage-stone .stage-lock-badge {
+    width: 30%;
+    height: 30%;
+    inset: 0 auto auto 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+
+  .stage-stone:hover, .stage-stone:focus-visible { transform: translateY(-8%); }
+  .stage-stone:active { transform: translateY(-3%); }
+
+  .stage-stone.locked { cursor: not-allowed; }
+  .stage-stone.locked:hover, .stage-stone.locked:focus-visible { transform: none; }
+
+  .stage-stone.next .stage-stone-img,
+  .stage-stone.next .stage-fx-img {
+    animation: nextStonePulse 1.8s ease-in-out infinite;
+  }
+  @keyframes nextStonePulse {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 213, 79, 0)); }
+    50%      { filter: drop-shadow(0 0 6px rgba(255, 213, 79, 0.85)); }
+  }
+
+  /* ---------- 게임 화면 헤더 ---------- */
+  .game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 480px;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .back-btn {
+    padding: 8px 14px;
     font-size: clamp(12px, 3.2vw, 14px);
     border: 1px solid #999;
-    border-radius: 16px;
+    border-radius: 8px;
     background: #fff;
-    cursor: pointer;
     color: #333;
+    cursor: pointer;
+    white-space: nowrap;
   }
-  .diff-btn.active {
-    background: #1565c0;
-    color: #fff;
-    border-color: #1565c0;
+  .back-btn:hover { background: #eee; }
+  .location-label {
+    flex: 1;
+    text-align: center;
     font-weight: bold;
+    color: #37474f;
+    font-size: clamp(13px, 3.6vw, 16px);
+  }
+  .timer-label {
+    font-variant-numeric: tabular-nums;
+    font-weight: bold;
+    color: #1565c0;
+    background: #e3f2fd;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: clamp(13px, 3.6vw, 15px);
+    min-width: 62px;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .status-bar {
@@ -187,6 +397,26 @@
     #controls button { padding: 8px 12px; font-size: 13px; }
   }
 
+  .reset-progress-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    border: 2px solid #6E3E13;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #B4762F 0%, #96581F 100%);
+    box-shadow: 0 0 0 3px #fff, 0 3px 6px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .35);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease, transform 0.1s ease;
+  }
+  .reset-progress-btn:hover { filter: brightness(1.1); }
+  .reset-progress-btn:active { transform: translateY(1px); }
+  .reset-icon { width: 14px; height: 14px; flex-shrink: 0; }
+
   #winOverlay {
     display: none;
     position: fixed;
@@ -254,11 +484,34 @@
   }
 
   .win-subtitle {
-    margin: 0 0 22px;
+    margin: 0 0 10px;
     color: #263238;
     font-size: 15px;
     font-weight: 600;
   }
+
+  .win-stars {
+    margin: 0 0 10px;
+    font-size: 30px;
+    letter-spacing: 3px;
+    color: #ffb300;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .win-new-record {
+    margin: 0 0 10px;
+    color: #d84315;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .win-time {
+    margin: 0 0 4px;
+    color: #1565c0;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .win-time:last-of-type { margin-bottom: 22px; }
 
   .win-newgame-btn {
     padding: 11px 22px;
@@ -275,38 +528,62 @@
 </head>
 <body>
 
-<h1>스도쿠</h1>
+<section id="homeScreen" class="screen active">
+  <div id="homeContent">
+    <div id="homeHeader">
+      <div id="difficultySelector"></div>
+      <button id="resetProgressBtn" class="reset-progress-btn">
+        <svg class="reset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 11A8 8 0 1 0 18.5 16"/>
+          <polyline points="20 4 20 11 13 11"/>
+        </svg>
+        <span>진행도 초기화</span>
+      </button>
+    </div>
+    <div id="homeToast" class="home-toast"></div>
+    <div id="stageMapWrap">
+      <div id="stageMap"></div>
+      <img class="title-logo" src="assets/ui/title-logo.webp" alt="SUDOKU Journey">
+      <img class="sign-board" src="assets/ui/sign-board.webp" alt="">
+    </div>
+  </div>
+</section>
 
-<div id="difficultyBar">
-  <button class="diff-btn" data-diff="easy">쉬움</button>
-  <button class="diff-btn" data-diff="medium">보통</button>
-  <button class="diff-btn" data-diff="hard">어려움</button>
-</div>
+<section id="gameScreen" class="screen">
+  <div class="game-header">
+    <button id="backBtn" class="back-btn">← 뒤로</button>
+    <div id="locationLabel" class="location-label"></div>
+    <div id="timerLabel" class="timer-label">00:00</div>
+  </div>
 
-<div class="status-bar">
-  <span id="filledCount"></span>
-</div>
+  <div class="status-bar">
+    <span id="filledCount"></span>
+  </div>
 
-<div id="board"></div>
+  <div id="board"></div>
 
-<div id="numpad"></div>
+  <div id="numpad"></div>
 
-<div id="modeBar">
-  <button id="memoToggle">✏️ 메모</button>
-</div>
+  <div id="modeBar">
+    <button id="memoToggle">✏️ 메모</button>
+  </div>
 
-<div id="controls">
-  <button id="newGameBtn">새 게임</button>
-  <button id="resetBtn">리셋</button>
-</div>
+  <div id="controls">
+    <button id="resetBtn">리셋</button>
+  </div>
 
-<div id="message"></div>
+  <div id="message"></div>
+</section>
 
 <div id="winOverlay">
   <div class="win-popup">
     <div class="win-title">🎉 축하합니다! 🎉</div>
     <p class="win-subtitle">스도쿠를 완성했습니다!</p>
-    <button id="winNewGameBtn" class="win-newgame-btn">새 게임하기</button>
+    <div id="winStars" class="win-stars"></div>
+    <p id="winNewRecord" class="win-new-record" style="display:none;">🏆 신기록!</p>
+    <p id="winThisTime" class="win-time"></p>
+    <p id="winBestTime" class="win-time"></p>
+    <button id="winNewGameBtn" class="win-newgame-btn">스테이지 목록으로</button>
   </div>
 </div>
 
@@ -314,6 +591,7 @@
 (function () {
   const SIZE = 9;
   const FULL_MASK = 0x1FF;
+  const STAGE_COUNT = 5;
 
   // 난이도: 남는(채워진) 칸 수 범위. 실측 결과 easy/medium/hard 모두
   // 아래 범위에서 안정적으로(수 ms 내) 유일해 퍼즐이 생성됨을 확인함.
@@ -323,7 +601,17 @@
     hard:   { label: '어려움', minFilled: 24, maxFilled: 26 }
   };
 
-  let currentDifficulty = 'easy';
+  // 난이도별 별점 기준(초). [3점 컷, 2점 컷] 이내면 해당 별점, 아니면 1점.
+  const STAR_TIME_THRESHOLDS = {
+    easy:   [180, 360],
+    medium: [360, 720],
+    hard:   [720, 1500]
+  };
+  const UNLOCK_STAR_REQUIREMENT = 7;
+  const PROGRESS_STORAGE_KEY = 'sudoku_progress';
+
+  let currentDifficulty = 'easy'; // 홈 화면에서 선택 중인 난이도
+  let currentStage = null;        // 현재 플레이 중인 스테이지 번호
   let solutionBoard = null;
   let puzzleBoard = null;   // 0 = 빈칸
   let givenMask = null;     // true면 원래 문제에서 채워진(수정 불가) 칸
@@ -332,15 +620,40 @@
   let selected = null;      // {row, col}
   let memoMode = false;
 
+  // ---------- 시드 기반 난수 (같은 스테이지 = 항상 같은 퍼즐) ----------
+
+  function hashSeed(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function createStageRng(difficultyKey, stageNumber) {
+    return mulberry32(hashSeed(`${difficultyKey}-${stageNumber}`));
+  }
+
   // ---------- 스도쿠 생성/검증 로직 (비트마스크 + MRV 백트래킹) ----------
 
   function createEmptyBoard() {
     return Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
   }
 
-  function shuffle(arr) {
+  function shuffle(arr, rng) {
     for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rng() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
@@ -373,25 +686,25 @@
     return null;
   }
 
-  // 무작위 순서로 채워서 랜덤한 완성 스도쿠 보드 생성 (생성 1회이므로 단순 백트래킹으로 충분)
-  function fillBoardRandomly(board) {
+  // 시드 순서로 채워서 완성 스도쿠 보드 생성 (생성 1회이므로 단순 백트래킹으로 충분)
+  function fillBoardRandomly(board, rng) {
     const empty = findEmptyCell(board);
     if (!empty) return true;
     const [row, col] = empty;
-    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], rng);
     for (const num of nums) {
       if (isValidPlacement(board, row, col, num)) {
         board[row][col] = num;
-        if (fillBoardRandomly(board)) return true;
+        if (fillBoardRandomly(board, rng)) return true;
         board[row][col] = 0;
       }
     }
     return false;
   }
 
-  function generateSolvedBoard() {
+  function generateSolvedBoard(rng) {
     const board = createEmptyBoard();
-    fillBoardRandomly(board);
+    fillBoardRandomly(board, rng);
     return board;
   }
 
@@ -454,15 +767,15 @@
 
   function cloneBoard(board) { return board.map(row => row.slice()); }
 
-  function generatePuzzle(difficultyKey) {
+  function generatePuzzle(difficultyKey, rng) {
     const { minFilled, maxFilled } = DIFFICULTIES[difficultyKey];
-    const solution = generateSolvedBoard();
+    const solution = generateSolvedBoard(rng);
     const puzzle = cloneBoard(solution);
 
-    const positions = shuffle(Array.from({ length: SIZE * SIZE }, (_, i) => i));
+    const positions = shuffle(Array.from({ length: SIZE * SIZE }, (_, i) => i), rng);
 
     let filledCount = SIZE * SIZE;
-    const target = minFilled + Math.floor(Math.random() * (maxFilled - minFilled + 1));
+    const target = minFilled + Math.floor(rng() * (maxFilled - minFilled + 1));
 
     for (const pos of positions) {
       if (filledCount <= target) break;
@@ -486,17 +799,364 @@
     return { puzzle, solution, filledCount };
   }
 
-  // ---------- 렌더링 & 상호작용 ----------
+  // ---------- 진행도 저장 (localStorage) ----------
+
+  function createEmptyProgress() {
+    return { stages: { easy: {}, medium: {}, hard: {} } };
+  }
+
+  function loadProgress() {
+    try {
+      const raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
+      if (!raw) return createEmptyProgress();
+      const parsed = JSON.parse(raw);
+      const result = createEmptyProgress();
+      Object.keys(result.stages).forEach(diff => {
+        Object.assign(result.stages[diff], (parsed.stages && parsed.stages[diff]) || {});
+      });
+      return result;
+    } catch (e) {
+      return createEmptyProgress();
+    }
+  }
+
+  let progress = loadProgress();
+
+  function saveProgress() {
+    localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+  }
+
+  function resetProgress() {
+    localStorage.removeItem(PROGRESS_STORAGE_KEY);
+    progress = createEmptyProgress();
+  }
+
+  function computeStars(difficultyKey, seconds) {
+    const [threeStarCut, twoStarCut] = STAR_TIME_THRESHOLDS[difficultyKey];
+    if (seconds <= threeStarCut) return 3;
+    if (seconds <= twoStarCut) return 2;
+    return 1;
+  }
+
+  function getStageRecord(difficultyKey, stageNumber) {
+    return progress.stages[difficultyKey][stageNumber] || null;
+  }
+
+  function getDifficultyStars(difficultyKey) {
+    let total = 0;
+    for (let s = 1; s <= STAGE_COUNT; s++) {
+      const rec = progress.stages[difficultyKey][s];
+      if (rec && rec.cleared) total += rec.stars;
+    }
+    return total;
+  }
+
+  function getDifficultyClearedCount(difficultyKey) {
+    let count = 0;
+    for (let s = 1; s <= STAGE_COUNT; s++) {
+      const rec = progress.stages[difficultyKey][s];
+      if (rec && rec.cleared) count++;
+    }
+    return count;
+  }
+
+  function isDifficultyUnlocked(difficultyKey) {
+    if (difficultyKey === 'easy') return true;
+    if (difficultyKey === 'medium') return getDifficultyStars('easy') >= UNLOCK_STAR_REQUIREMENT;
+    if (difficultyKey === 'hard') return getDifficultyStars('medium') >= UNLOCK_STAR_REQUIREMENT;
+    return false;
+  }
+
+  function isStageUnlocked(difficultyKey, stageNumber) {
+    if (!isDifficultyUnlocked(difficultyKey)) return false;
+    if (stageNumber === 1) return true;
+    const prev = getStageRecord(difficultyKey, stageNumber - 1);
+    return !!(prev && prev.cleared);
+  }
+
+  // 현재 도전해야 할 스테이지(잠기지 않았고 아직 클리어하지 않은 첫 스테이지)
+  function getNextChallengeStage(difficultyKey) {
+    for (let s = 1; s <= STAGE_COUNT; s++) {
+      if (!isStageUnlocked(difficultyKey, s)) continue;
+      const rec = getStageRecord(difficultyKey, s);
+      if (!rec || !rec.cleared) return s;
+    }
+    return null;
+  }
+
+  // 클리어 시점에만 호출. 더 좋은 기록일 때만 별점/최고 기록 갱신.
+  function recordCompletion(difficultyKey, stageNumber, seconds) {
+    const existing = getStageRecord(difficultyKey, stageNumber);
+    const isNewRecord = !existing || seconds < existing.bestTime;
+
+    if (!existing) {
+      progress.stages[difficultyKey][stageNumber] = {
+        cleared: true,
+        stars: computeStars(difficultyKey, seconds),
+        bestTime: seconds
+      };
+    } else if (seconds < existing.bestTime) {
+      existing.stars = computeStars(difficultyKey, seconds);
+      existing.bestTime = seconds;
+    }
+
+    saveProgress();
+
+    const rec = getStageRecord(difficultyKey, stageNumber);
+    return { stars: rec.stars, bestTime: rec.bestTime, thisTime: seconds, isNewRecord };
+  }
+
+  function starString(stars) {
+    return '★'.repeat(stars) + '☆'.repeat(3 - stars);
+  }
+
+  // ---------- 화면/DOM 참조 ----------
+
+  const homeScreen = document.getElementById('homeScreen');
+  const gameScreen = document.getElementById('gameScreen');
+  const difficultySelectorEl = document.getElementById('difficultySelector');
+  const stageMapEl = document.getElementById('stageMap');
+  const homeToastEl = document.getElementById('homeToast');
+  const resetProgressBtn = document.getElementById('resetProgressBtn');
+  const backBtn = document.getElementById('backBtn');
+  const locationLabelEl = document.getElementById('locationLabel');
+  const timerLabelEl = document.getElementById('timerLabel');
 
   const boardEl = document.getElementById('board');
   const numpadEl = document.getElementById('numpad');
   const messageEl = document.getElementById('message');
   const filledCountEl = document.getElementById('filledCount');
   const memoToggleBtn = document.getElementById('memoToggle');
-  const diffButtons = Array.from(document.querySelectorAll('.diff-btn'));
   const winOverlay = document.getElementById('winOverlay');
+  const winStarsEl = document.getElementById('winStars');
+  const winNewRecordEl = document.getElementById('winNewRecord');
+  const winThisTimeEl = document.getElementById('winThisTime');
+  const winBestTimeEl = document.getElementById('winBestTime');
   const winNewGameBtn = document.getElementById('winNewGameBtn');
   const numberButtons = {}; // num -> button element
+
+  // ---------- 타이머 ----------
+
+  let timerInterval = null;
+  let elapsedSeconds = 0;
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function formatTime(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${pad2(m)}:${pad2(s)}`;
+  }
+
+  function startTimer() {
+    stopTimer();
+    elapsedSeconds = 0;
+    timerLabelEl.textContent = formatTime(0);
+    timerInterval = setInterval(() => {
+      elapsedSeconds++;
+      timerLabelEl.textContent = formatTime(elapsedSeconds);
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  // ---------- 홈 화면: 난이도 선택 + 스테이지 맵 ----------
+
+  let homeToastTimer = null;
+  function showHomeToast(text) {
+    homeToastEl.textContent = text;
+    homeToastEl.classList.add('show');
+    clearTimeout(homeToastTimer);
+    homeToastTimer = setTimeout(() => homeToastEl.classList.remove('show'), 2600);
+  }
+
+  function lockedDifficultyMessage(difficultyKey) {
+    if (difficultyKey === 'medium') {
+      return `${DIFFICULTIES.easy.label}에서 별 ${UNLOCK_STAR_REQUIREMENT}개를 모으면 열려요 (현재 ${getDifficultyStars('easy')}개)`;
+    }
+    if (difficultyKey === 'hard') {
+      return `${DIFFICULTIES.medium.label}에서 별 ${UNLOCK_STAR_REQUIREMENT}개를 모으면 열려요 (현재 ${getDifficultyStars('medium')}개)`;
+    }
+    return '';
+  }
+
+  function renderDifficultySelector() {
+    difficultySelectorEl.innerHTML = '';
+    Object.keys(DIFFICULTIES).forEach(key => {
+      const unlocked = isDifficultyUnlocked(key);
+      const clearedCount = getDifficultyClearedCount(key);
+
+      const btn = document.createElement('button');
+      btn.className = 'diff-tab' + (unlocked ? '' : ' locked');
+      btn.dataset.diff = key;
+      btn.classList.toggle('active', key === currentDifficulty);
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = (unlocked ? '' : '🔒 ') + DIFFICULTIES[key].label;
+      const starsSpan = document.createElement('span');
+      starsSpan.className = 'diff-tab-stars';
+      starsSpan.textContent = `${clearedCount}/${STAGE_COUNT}`;
+      btn.appendChild(labelSpan);
+      btn.appendChild(starsSpan);
+
+      btn.addEventListener('click', () => {
+        if (!unlocked) {
+          showHomeToast(lockedDifficultyMessage(key));
+          return;
+        }
+        if (key === currentDifficulty) return;
+        currentDifficulty = key;
+        renderDifficultySelector();
+        renderStageMap();
+      });
+      difficultySelectorEl.appendChild(btn);
+    });
+  }
+
+  // ---------- 스테이지 맵 (배경 이미지 위 절대 위치) ----------
+
+  // 배경마다 강의 경로가 달라 좌표가 다르다. index 0 = 마지막 단계(맨 위) ... 마지막 index = 1단계(맨 아래).
+  const STAGES = {
+    desktop: [
+      { x: 77, y: 13, size: 10.0 },
+      { x: 63, y: 29, size: 11.0 },
+      { x: 57, y: 48, size: 12.5 },
+      { x: 41, y: 66, size: 14.0 },
+      { x: 32, y: 87, size: 16.0 }
+    ],
+    mobile: [
+      { x: 59, y: 14, size: 14.0 },
+      { x: 52, y: 32, size: 14.6 },
+      { x: 42, y: 51, size: 15.4 },
+      { x: 46, y: 70, size: 16.2 },
+      { x: 37, y: 88, size: 17.0 }
+    ]
+  };
+
+  function getStageCoords() {
+    return window.innerWidth >= 768 ? STAGES.desktop : STAGES.mobile;
+  }
+
+  // 배경(#stageMap)의 실제 렌더링 너비 대비 sizePercent(%)로 돌 크기를 계산.
+  // .stage-stone-wrap이 width:auto인 절대 위치 박스라 %가 순환 참조로 0에
+  // 수렴해버리므로(항상 clamp 하한에 고정되는 버그), JS에서 직접 px로 계산해 준다.
+  function computeStoneSizePx(sizePercent) {
+    const mapWidth = stageMapEl.getBoundingClientRect().width || 300;
+    return Math.max(40, Math.min(mapWidth * (sizePercent / 100), 220));
+  }
+
+  function renderStageMap() {
+    stageMapEl.innerHTML = '';
+    const nextStage = getNextChallengeStage(currentDifficulty);
+    const coords = getStageCoords();
+
+    for (let stage = 1; stage <= STAGE_COUNT; stage++) {
+      const pos = coords[STAGE_COUNT - stage];
+      const unlocked = isStageUnlocked(currentDifficulty, stage);
+      const record = getStageRecord(currentDifficulty, stage);
+      const cleared = !!(record && record.cleared);
+      const isNext = unlocked && !cleared && stage === nextStage;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'stage-stone-wrap';
+      wrap.style.left = pos.x + '%';
+      wrap.style.top = pos.y + '%';
+
+      const stone = document.createElement('button');
+      stone.type = 'button';
+      stone.className = 'stage-stone' + (unlocked ? '' : ' locked') + (isNext ? ' next' : '');
+      stone.style.width = computeStoneSizePx(pos.size) + 'px';
+
+      if (!unlocked) {
+        const fxImg = document.createElement('img');
+        fxImg.className = 'stage-fx-img';
+        fxImg.alt = '';
+        fxImg.src = 'assets/stones/fx-locked.webp';
+        stone.appendChild(fxImg);
+      } else if (isNext) {
+        const fxImg = document.createElement('img');
+        fxImg.className = 'stage-fx-img';
+        fxImg.alt = '';
+        fxImg.src = 'assets/stones/fx-selected.webp';
+        stone.appendChild(fxImg);
+      }
+
+      const stoneImg = document.createElement('img');
+      stoneImg.className = 'stage-stone-img';
+      stoneImg.alt = '';
+      stoneImg.src = `assets/stones/stone-${stage}.webp`;
+      stone.appendChild(stoneImg);
+
+      if (!unlocked) {
+        const lockBadge = document.createElement('img');
+        lockBadge.className = 'stage-lock-badge';
+        lockBadge.alt = '';
+        lockBadge.src = 'assets/stones/icon-lock-sm.webp';
+        stone.appendChild(lockBadge);
+      }
+
+      if (unlocked) {
+        stone.setAttribute('aria-label', `${DIFFICULTIES[currentDifficulty].label} ${stage}단계`);
+        stone.addEventListener('click', () => enterStage(currentDifficulty, stage));
+      } else {
+        stone.disabled = true;
+        stone.setAttribute('aria-label', `${DIFFICULTIES[currentDifficulty].label} ${stage}단계 (잠김)`);
+      }
+      wrap.appendChild(stone);
+
+      if (cleared) {
+        const starsEl = document.createElement('div');
+        starsEl.className = 'stage-stars';
+        starsEl.textContent = starString(record.stars);
+        wrap.appendChild(starsEl);
+      }
+
+      stageMapEl.appendChild(wrap);
+    }
+  }
+
+  function goHome() {
+    stopTimer();
+    hideWinPopup();
+    gameScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    renderDifficultySelector();
+    renderStageMap();
+  }
+
+  function enterStage(difficultyKey, stageNumber) {
+    if (!isStageUnlocked(difficultyKey, stageNumber)) return;
+
+    currentDifficulty = difficultyKey;
+    currentStage = stageNumber;
+
+    messageEl.textContent = '';
+    selected = null;
+    setMemoMode(false);
+    hideWinPopup();
+
+    const rng = createStageRng(difficultyKey, stageNumber);
+    const { puzzle, solution } = generatePuzzle(difficultyKey, rng);
+    solutionBoard = solution;
+    puzzleBoard = puzzle;
+    userBoard = cloneBoard(puzzle);
+    givenMask = puzzle.map(row => row.map(v => v !== 0));
+    notesBoard = Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => new Set()));
+
+    locationLabelEl.textContent = `${DIFFICULTIES[difficultyKey].label} · ${stageNumber}단계`;
+
+    homeScreen.classList.remove('active');
+    gameScreen.classList.add('active');
+
+    startTimer();
+    render();
+  }
+
+  // ---------- 게임 화면 렌더링 & 상호작용 ----------
 
   function buildBoardDom() {
     boardEl.innerHTML = '';
@@ -586,6 +1246,7 @@
     messageEl.textContent = '';
     userBoard = cloneBoard(puzzleBoard);
     notesBoard = Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => new Set()));
+    startTimer();
     render();
   }
 
@@ -681,7 +1342,11 @@
 
   function checkWin() {
     const isComplete = userBoard.every((row, r) => row.every((v, c) => v === solutionBoard[r][c]));
-    if (isComplete) showWinPopup();
+    if (isComplete) {
+      stopTimer();
+      const result = recordCompletion(currentDifficulty, currentStage, elapsedSeconds);
+      showWinPopup(result);
+    }
   }
 
   const CONFETTI_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bcb', '#845ef7'];
@@ -705,7 +1370,11 @@
     winOverlay.querySelectorAll('.confetti-piece').forEach(el => el.remove());
   }
 
-  function showWinPopup() {
+  function showWinPopup(result) {
+    winStarsEl.textContent = starString(result.stars);
+    winNewRecordEl.style.display = result.isNewRecord ? 'block' : 'none';
+    winThisTimeEl.textContent = `이번 기록 ${formatTime(result.thisTime)}`;
+    winBestTimeEl.textContent = `최고 기록 ${formatTime(result.bestTime)}`;
     spawnConfetti(60);
     winOverlay.classList.add('show');
   }
@@ -720,30 +1389,8 @@
     memoToggleBtn.classList.toggle('active', memoMode);
   }
 
-  function updateDifficultyButtons() {
-    diffButtons.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.diff === currentDifficulty);
-    });
-  }
-
-  function startNewGame() {
-    messageEl.textContent = '';
-    selected = null;
-    setMemoMode(false);
-    hideWinPopup();
-
-    const { puzzle, solution } = generatePuzzle(currentDifficulty);
-    solutionBoard = solution;
-    puzzleBoard = puzzle;
-    userBoard = cloneBoard(puzzle);
-    givenMask = puzzle.map(row => row.map(v => v !== 0));
-    notesBoard = Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => new Set()));
-
-    updateDifficultyButtons();
-    render();
-  }
-
   document.addEventListener('keydown', (e) => {
+    if (!gameScreen.classList.contains('active')) return;
     if (winOverlay.classList.contains('show')) return;
     if (!selected) return;
     if (e.key >= '1' && e.key <= '9') {
@@ -761,24 +1408,30 @@
     }
   });
 
-  document.getElementById('newGameBtn').addEventListener('click', startNewGame);
   document.getElementById('resetBtn').addEventListener('click', resetBoard);
   memoToggleBtn.addEventListener('click', () => setMemoMode(!memoMode));
-  winNewGameBtn.addEventListener('click', () => {
-    startNewGame();
+  backBtn.addEventListener('click', goHome);
+  winNewGameBtn.addEventListener('click', goHome);
+
+  resetProgressBtn.addEventListener('click', () => {
+    if (!confirm('모든 기록이 삭제됩니다. 계속할까요?')) return;
+    resetProgress();
+    currentDifficulty = 'easy';
+    renderDifficultySelector();
+    renderStageMap();
   });
 
-  diffButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (btn.dataset.diff === currentDifficulty) return;
-      currentDifficulty = btn.dataset.diff;
-      startNewGame();
-    });
+  let stageMapResizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (!homeScreen.classList.contains('active')) return;
+    clearTimeout(stageMapResizeTimer);
+    stageMapResizeTimer = setTimeout(renderStageMap, 150);
   });
 
   buildBoardDom();
   buildNumpadDom();
-  startNewGame();
+  renderDifficultySelector();
+  renderStageMap();
 })();
 </script>
 
